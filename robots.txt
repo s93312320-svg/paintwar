@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://paintwar.pages.dev/sitemap.xml

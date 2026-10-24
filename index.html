@@ -2,8 +2,6 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.arcgisonline.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
-<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Territory Drawer — draw and close a territory on a satellite map</title>
 <meta name="description" content="Interactive satellite-map simulator: outline an area with a freehand lasso and change who it belongs to — Україна or Росія. Works on desktop and mobile. No sign-up, no tracking.">
@@ -17,21 +15,28 @@
 <meta property="og:title" content="Territory Drawer — draw and close a territory">
 <meta property="og:description" content="Outline an area on a satellite map and change its ownership. Works on desktop and mobile.">
 <meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://server.arcgisonline.com">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preload" as="script" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1118'/%3E%3Cpath d='M32 12C18 12 9 22 12 34c3 12 16 18 26 16 12-3 16-14 14-24C50 17 42 12 32 12z' fill='%231d6bff'/%3E%3Cpath d='M32 12c10 0 18 5 20 14 2 10-2 21-14 24z' fill='%23ff4d1f'/%3E%3Cpath d='M32 12C18 12 9 22 12 34c3 12 16 18 26 16 12-3 16-14 14-24C50 17 42 12 32 12z' fill='none' stroke='%23ff1f1f' stroke-width='4' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css'">
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#0b1118;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #map{position:fixed;inset:0;background:#0b1118}
 canvas.ov{position:absolute;left:0;top:0;width:100%;height:100%}
-#t{z-index:500;pointer-events:none}
+#t{z-index:500;pointer-events:none;opacity:0;transition:opacity .9s ease}
+#t.on{opacity:1}
 #l{z-index:501;touch-action:none;cursor:crosshair}
 body.move #l{pointer-events:none}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 .glass{position:fixed;z-index:1000;color:#fff;background:rgba(14,20,28,.74);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);box-shadow:0 4px 18px rgba(0,0,0,.35);touch-action:manipulation}
 #legend{top:max(12px,env(safe-area-inset-top));left:max(12px,env(safe-area-inset-left));border-radius:12px;padding:5px;display:flex;flex-direction:column;gap:2px;min-width:156px}
-.side{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px 8px 9px;border-radius:8px;font-size:15px;font-weight:600;background:none;border:1.5px solid transparent;text-align:left}
+.side{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px 8px 9px;border-radius:8px;font-size:15px;font-weight:600;background:none;border:1.5px solid transparent;text-align:left;transition:background .2s,border-color .2s}
 .side.on{border-color:rgba(255,255,255,.8);background:rgba(255,255,255,.12)}
 .side i{width:16px;height:16px;border-radius:4px;flex:none}
 .side span{flex:1}
@@ -45,8 +50,8 @@ button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 @media(hover:hover){#tools button:not([disabled]):hover,#helpbtn:hover{background:rgba(255,255,255,.14)}}
 body.move #mv{background:#e11}
 #toast{bottom:calc(92px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);border-radius:999px;padding:8px 16px;font-size:13px;white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
-#help{z-index:1100;inset:0;margin:auto;width:min(92vw,470px);height:fit-content;max-height:84vh;overflow:auto;border-radius:16px;padding:18px 20px;display:none;font-size:14px;line-height:1.5;-webkit-user-select:text;user-select:text}
-#help.on{display:block}
+#help{z-index:1100;inset:0;margin:auto;width:min(92vw,470px);height:fit-content;max-height:84vh;overflow:auto;border-radius:16px;padding:18px 20px;visibility:hidden;opacity:0;transform:translateY(10px) scale(.98);transition:opacity .22s,transform .22s,visibility .22s;font-size:14px;line-height:1.5;-webkit-user-select:text;user-select:text}
+#help.on{visibility:visible;opacity:1;transform:none}
 #help h2{margin:0 0 8px;font-size:18px}
 #help ul{margin:0;padding-left:18px}
 #help li{margin:4px 0}
@@ -112,14 +117,14 @@ const proj=r=>{const a=new Float64Array(r.length);for(let i=0;i<r.length;i+=2){a
 // strip along the Ukraine–Russia border (inside Ukraine <-> inside Russia): closes any gap between the two outlines
 const SEAM=[38.1,47.25,39,47.6,41,48,42,49.3,40.5,51,36.5,52.3,33.5,52.8,32.2,52.3,31.8,52.1,32.2,51.4,34.5,50,36.3,48.9,36.8,47.6,37.4,47.25];
 const UAop={c:'u',b:1,rings:UA.map(proj)};
-let base=[UAop],user=[],redo=[],side='r',pts=null,pid=0,fade=0,raf=0,W=0,H=0;
+let base=[UAop],user=[],redo=[],dying=[],side='r',pts=null,pid=0,fade=0,raf=0,sraf=0,W=0,H=0,ckey='',ver=0,cver=-1;
 setTimeout(hideBoot,9000);
 
 // ---- map
 const map=L.map('map',{zoomControl:false,zoomAnimation:false,fadeAnimation:false,markerZoomAnimation:false,doubleClickZoom:false,boxZoom:false,zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80,minZoom:2,maxZoom:17,bounceAtZoomLimits:false,maxBounds:[[-85.0511,-180],[85.0511,180]],maxBoundsViscosity:1});
 const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/';
-const sat=L.tileLayer(ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}',{noWrap:true,maxNativeZoom:17,maxZoom:17,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}).addTo(map);
-L.tileLayer(ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{noWrap:true,maxNativeZoom:17,maxZoom:17,opacity:.85}).addTo(map);
+const sat=L.tileLayer(ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}',{noWrap:true,updateWhenIdle:false,keepBuffer:3,maxNativeZoom:17,maxZoom:17,attribution:'Imagery © Esri, Maxar, Earthstar Geographics'}).addTo(map);
+L.tileLayer(ESRI+'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{noWrap:true,updateWhenIdle:false,keepBuffer:3,maxNativeZoom:17,maxZoom:17,opacity:.85}).addTo(map);
 sat.once('load',hideBoot);
 let tileWarn=0;
 sat.on('tileerror',()=>{if(!tileWarn){tileWarn=1;toast('Some map tiles failed to load. Check your connection.');setTimeout(()=>toast(''),5000)}});
@@ -129,34 +134,58 @@ const home=()=>map.fitBounds([[44.2,22.1],[52.4,40.3]],{padding:[24,24]}),
       fitMin=()=>{const z=map.getSize();map.setMinZoom(Math.max(1,Math.ceil(Math.log2(Math.max(z.x,z.y)/256)*4)/4))}; // min zoom: the world fills the screen, so it is never repeated
 fitMin();home();
 
-// ---- canvases: t = territories (alpha-composited), l = freehand lasso
-const dpr=Math.min(window.devicePixelRatio||1,2),box=map.getContainer();
+// ---- canvases: t = territories (alpha-composited), l = freehand lasso; off/cache = painter's layers
+const dpr=Math.min(window.devicePixelRatio||1,2),box=map.getContainer(),reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const mk=id=>{const c=document.createElement('canvas');if(id){c.id=id;c.className='ov';box.appendChild(c)}return c};
-const tcv=mk('t'),lcv=mk('l'),off=mk(),tc=tcv.getContext('2d'),lc=lcv.getContext('2d'),oc=off.getContext('2d');
-function size(){const z=map.getSize();W=z.x;H=z.y;for(const c of[tcv,lcv,off]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr)}oc.setTransform(dpr,0,0,dpr,0,0);lc.setTransform(dpr,0,0,dpr,0,0)}
+const tcv=mk('t'),lcv=mk('l'),off=mk(),cache=mk(),tc=tcv.getContext('2d'),lc=lcv.getContext('2d'),oc=off.getContext('2d'),cc=cache.getContext('2d');
+const showT=()=>tcv.classList.add('on');setTimeout(showT,3500); // territories fade in once the borders are ready
+function size(){const z=map.getSize();W=z.x;H=z.y;for(const c of[tcv,lcv,off,cache]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr)}for(const g of[oc,lc,cc])g.setTransform(dpr,0,0,dpr,0,0);ckey=''}
 
-function draw(){
-  raf=0;
-  const s=256*Math.pow(2,map.getZoom()),o=map.getPixelBounds().min,m0=Math.floor(o.x/s)-1,m1=Math.floor((o.x+W)/s);
-  oc.clearRect(0,0,W,H);
-  for(const op of base.concat(user)){
-    oc.globalCompositeOperation=op.b?'source-over':'source-atop'; // user shapes only recolour existing land
-    oc.fillStyle=COL[op.c];
-    oc.beginPath();
-    for(let m=m0;m<=m1;m++)for(const r of op.rings){ // m = neighbouring world copy (needed for the Chukotka tip beyond 180°)
-      const b=r.bb;
-      if((b[2]+m)*s<o.x||(b[0]+m)*s>o.x+W||b[3]*s<o.y||b[1]*s>o.y+H)continue; // ring is off-screen
-      for(let i=0;i<r.length;i+=2){const x=(r[i]+m)*s-o.x,y=r[i+1]*s-o.y;i?oc.lineTo(x,y):oc.moveTo(x,y)}
-      oc.closePath();
-    }
-    oc.fill(op.b?'evenodd':'nonzero');
+// ---- rendering: the static layer is cached; only shapes that are filling in are redrawn every frame
+const ease=t=>1-Math.pow(1-t,3),now=()=>performance.now(),fmt=v=>v.toFixed(1)+'%';
+const COLA={u:'rgba(29,107,255,0)',r:'rgba(255,77,31,0)'};
+const prog=(op,t)=>{const a=op.a,k=Math.max(0,Math.min(1,(t-a.t0)/a.dur));return a.from+(a.to-a.from)*ease(k)};
+function paint(g,op,s,o,m0,m1,low){ // solid fill of one shape
+  g.globalCompositeOperation=op.b?'source-over':'source-atop'; // user shapes only recolour existing land
+  g.fillStyle=COL[op.c];g.beginPath();
+  for(let m=m0;m<=m1;m++)for(const r of(low&&op.low)||op.rings){ // m = neighbouring world copy (needed for the Chukotka tip beyond 180°)
+    const b=r.bb;
+    if((b[2]+m)*s<o.x||(b[0]+m)*s>o.x+W||b[3]*s<o.y||b[1]*s>o.y+H)continue; // ring is off-screen
+    for(let i=0;i<r.length;i+=2){const x=(r[i]+m)*s-o.x,y=r[i+1]*s-o.y;i?g.lineTo(x,y):g.moveTo(x,y)}
+    g.closePath();
   }
-  tc.setTransform(1,0,0,1,0,0);
-  tc.clearRect(0,0,tcv.width,tcv.height);
-  tc.globalAlpha=.5;
-  tc.drawImage(off,0,0);
+  g.fill(op.b?'evenodd':'nonzero');
 }
-const redraw=()=>{if(!raf)raf=requestAnimationFrame(draw)};
+function reveal(g,op,s,o,p){ // a shape filling in from its centre outwards, with a soft edge
+  const R=op.R*s,soft=Math.min(80,R*.35),ro=p*(R+soft);
+  if(ro<1)return;
+  const cx=op.cx*s-o.x,cy=op.cy*s-o.y,gr=g.createRadialGradient(cx,cy,0,cx,cy,ro);
+  gr.addColorStop(0,COL[op.c]);gr.addColorStop(Math.min(.999,Math.max(0,ro-soft)/ro),COL[op.c]);gr.addColorStop(1,COLA[op.c]);
+  g.globalCompositeOperation='source-atop';g.fillStyle=gr;g.beginPath();
+  const r=op.rings[0];
+  for(let i=0;i<r.length;i+=2){const x=r[i]*s-o.x,y=r[i+1]*s-o.y;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.closePath();g.fill();
+}
+function draw(t){
+  t=t||now();
+  const z=map.getZoom(),s=256*Math.pow(2,z),o=map.getPixelBounds().min,m0=Math.floor(o.x/s)-1,m1=Math.floor((o.x+W)/s),low=z<6,key=[s,o.x,o.y,W,H].join();
+  for(const op of user)if(op.a&&t-op.a.t0>=op.a.dur){op.a=null;ver++} // finished filling: becomes part of the cached layer
+  dying=dying.filter(op=>t-op.a.t0<op.a.dur);
+  if(key!==ckey||cver!==ver){
+    cc.clearRect(0,0,W,H);
+    for(const op of base)paint(cc,op,s,o,m0,m1,low);
+    for(const op of user)if(!op.a)paint(cc,op,s,o,m0,m1,low);
+    ckey=key;cver=ver;
+  }
+  oc.setTransform(1,0,0,1,0,0);oc.globalCompositeOperation='source-over';oc.clearRect(0,0,off.width,off.height);oc.drawImage(cache,0,0);oc.setTransform(dpr,0,0,dpr,0,0);
+  for(const op of user)if(op.a)reveal(oc,op,s,o,prog(op,t));
+  for(const op of dying)reveal(oc,op,s,o,prog(op,t));
+  tc.setTransform(1,0,0,1,0,0);tc.clearRect(0,0,tcv.width,tcv.height);tc.globalAlpha=.5;tc.drawImage(off,0,0);
+}
+const pct={cur:null,from:[0,0],to:[0,0],t0:0,dur:1,on:0};
+const active=()=>user.some(o=>o.a)||dying.length>0||pct.on;
+function tick(t){raf=0;draw(t);tickPct(t);if(active())redraw()}
+const redraw=()=>{if(!raf)raf=requestAnimationFrame(tick)};
 map.on('move zoom viewreset',redraw);
 map.on('resize',()=>{fitMin();size();redraw()});
 
@@ -165,7 +194,14 @@ const ub=UAop.rings.reduce((a,r)=>[Math.min(a[0],r.bb[0]),Math.min(a[1],r.bb[1])
 const SW=720,SH=Math.round(SW*(ub[3]-ub[1])/(ub[2]-ub[0])),kx=SW/(ub[2]-ub[0]),ky=SH/(ub[3]-ub[1]);
 const sc=document.createElement('canvas');sc.width=SW;sc.height=SH;
 const sg=sc.getContext('2d',{willReadFrequently:true});
-function stats(){
+function showPct(u,r){$('#pu').textContent=fmt(u);$('#pr').textContent=fmt(r)}
+function tickPct(t){ // the percentages count up/down together with the fill animation
+  if(!pct.on)return;
+  const k=Math.max(0,Math.min(1,(t-pct.t0)/pct.dur)),e=ease(k);
+  pct.cur=[pct.from[0]+(pct.to[0]-pct.from[0])*e,pct.from[1]+(pct.to[1]-pct.from[1])*e];
+  showPct(pct.cur[0],pct.cur[1]);if(k>=1)pct.on=0;
+}
+function stats(dur){
   sg.setTransform(1,0,0,1,0,0);sg.clearRect(0,0,SW,SH);
   sg.setTransform(kx,0,0,ky,-ub[0]*kx,-ub[1]*ky);
   for(const op of[UAop].concat(user)){
@@ -178,27 +214,46 @@ function stats(){
     const w=Math.pow(Math.cos(Math.atan(Math.sinh(Math.PI*(1-2*(ub[1]+(y+.5)/ky))))),2); // Mercator pixel -> true area
     for(let x=0,i=y*SW*4;x<SW;x++,i+=4)if(d[i+3]>127){if(d[i+2]>d[i])u+=w;else r+=w}
   }
-  const t=u+r||1;
-  $('#pu').textContent=(100*u/t).toFixed(1)+'%';$('#pr').textContent=(100*r/t).toFixed(1)+'%';
+  const tt=u+r||1,pu=100*u/tt,pr=100*r/tt;
+  if(!pct.cur){pct.cur=[pu,pr];pct.to=[pu,pr];showPct(pu,pr);return}
+  pct.from=pct.cur;pct.to=[pu,pr];pct.t0=now();pct.dur=Math.max(1,dur||1);pct.on=1;redraw();
 }
 
-// ---- state: autosave / undo / redo
+// ---- state: autosave / undo / redo (shapes fill in and out with an animation)
+function mkop(c,a){
+  bbox(a);const b=a.bb,cx=(b[0]+b[2])/2,cy=(b[1]+b[3])/2;let R=0;
+  for(let i=0;i<a.length;i+=2)R=Math.max(R,Math.hypot(a[i]-cx,a[i+1]-cy));
+  return{c,rings:[a],cx,cy,R};
+}
 const persist=()=>{try{localStorage.setItem(KEY,JSON.stringify(user.map(o=>({c:o.c,p:Array.from(o.rings[0],v=>Math.round(v*1e8)/1e8)}))))}catch(e){}};
-const restore=()=>{try{user=JSON.parse(localStorage.getItem(KEY)||'[]').filter(o=>COL[o.c]&&Array.isArray(o.p)&&o.p.length>5).map(o=>({c:o.c,rings:[bbox(Float64Array.from(o.p))]}))}catch(e){user=[]}};
+let psT=0;const persistSoon=()=>{clearTimeout(psT);psT=setTimeout(persist,400)};
+const restore=()=>{try{user=JSON.parse(localStorage.getItem(KEY)||'[]').filter(o=>COL[o.c]&&Array.isArray(o.p)&&o.p.length>5).map(o=>mkop(o.c,Float64Array.from(o.p)))}catch(e){user=[]}};
 const sync=()=>{$('#un').disabled=!user.length;$('#re').disabled=!redo.length};
-function changed(){persist();stats();draw();sync()}
-const undo=()=>{const o=user.pop();if(o){redo.push(o);changed()}};
-const redoOp=()=>{const o=redo.pop();if(o){user.push(o);changed()}};
+function launch(op,to,dur){const t=now(),cur=op.a?prog(op,t):(to?0:1);op.a={t0:t,dur:reduce?1:dur,from:cur,to}}
+function changed(dur){persistSoon();stats(dur);sync();redraw()}
+const undo=()=>{const op=user.pop();if(!op)return;launch(op,0,450);dying.push(op);redo.push(op);ver++;changed(450)};
+const redoOp=()=>{const op=redo.pop();if(!op)return;const i=dying.indexOf(op);if(i>=0)dying.splice(i,1);user.push(op);launch(op,1,op.d||700);changed(op.d||700)};
+const finishAnims=()=>{for(const op of user)if(op.a)op.a.t0=-1e9;dying=[];pct.on=0;if(pct.cur){pct.cur=pct.to.slice();showPct(pct.cur[0],pct.cur[1])}};
 
 // ---- lasso
 function rdp(p,e){ // Ramer–Douglas–Peucker: fewer points, same shape
   const n=p.length,k=new Uint8Array(n),st=[0,n-1];k[0]=k[n-1]=1;
   while(st.length){
-    const b=st.pop(),a=st.pop(),dx=p[b][0]-p[a][0],dy=p[b][1]-p[a][1],L=Math.hypot(dx,dy)||1;let m=0,mi=-1;
-    for(let i=a+1;i<b;i++){const d=Math.abs(dy*(p[i][0]-p[a][0])-dx*(p[i][1]-p[a][1]))/L;if(d>m){m=d;mi=i}}
+    const b=st.pop(),a=st.pop(),dx=p[b][0]-p[a][0],dy=p[b][1]-p[a][1],L=Math.hypot(dx,dy);let m=0,mi=-1;
+    for(let i=a+1;i<b;i++){const d=L?Math.abs(dy*(p[i][0]-p[a][0])-dx*(p[i][1]-p[a][1]))/L:Math.hypot(p[i][0]-p[a][0],p[i][1]-p[a][1]);if(d>m){m=d;mi=i}}
     if(m>e){k[mi]=1;st.push(a,mi,mi,b)}
   }
   return p.filter((_,i)=>k[i]);
+}
+function chaikin(p,n){ // corner cutting: rounds the outline so it stays smooth when zoomed in
+  for(let k=0;k<n;k++){const q=[];for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];q.push([.75*a[0]+.25*b[0],.75*a[1]+.25*b[1]],[.25*a[0]+.75*b[0],.25*a[1]+.75*b[1]])}p=q}
+  return p;
+}
+function trace(p,closed){ // smooth curve through the midpoints of the segments
+  const n=p.length,m=i=>[(p[i%n][0]+p[(i+1)%n][0])/2,(p[i%n][1]+p[(i+1)%n][1])/2];
+  lc.beginPath();
+  if(closed){const a=m(n-1);lc.moveTo(a[0],a[1]);for(let i=0;i<n;i++){const b=m(i);lc.quadraticCurveTo(p[i][0],p[i][1],b[0],b[1])}lc.closePath()}
+  else{lc.moveTo(p[0][0],p[0][1]);for(let i=1;i<n-1;i++){const b=m(i);lc.quadraticCurveTo(p[i][0],p[i][1],b[0],b[1])}lc.lineTo(p[n-1][0],p[n-1][1])}
 }
 function stroke(closed){
   lc.clearRect(0,0,W,H);
@@ -208,27 +263,32 @@ function stroke(closed){
     lc.beginPath();lc.moveTo(pts[pts.length-1][0],pts[pts.length-1][1]);lc.lineTo(pts[0][0],pts[0][1]);
     lc.setLineDash([4,8]);lc.lineWidth=2;lc.strokeStyle='rgba(255,70,70,.55)';lc.stroke();lc.setLineDash([]);
   }
-  lc.beginPath();
-  pts.forEach((p,i)=>i?lc.lineTo(p[0],p[1]):lc.moveTo(p[0],p[1]));
-  if(closed){lc.closePath();lc.fillStyle='rgba(255,40,40,.2)';lc.fill()}
-  lc.lineWidth=4;lc.strokeStyle='#ff1f1f';lc.shadowColor='rgba(255,0,0,.9)';lc.shadowBlur=10;lc.stroke();lc.shadowBlur=0;
+  trace(pts,closed);
+  if(closed){lc.fillStyle='rgba(255,40,40,.18)';lc.fill()}
+  lc.lineWidth=11;lc.strokeStyle='rgba(255,40,40,.28)';lc.stroke(); // glow
+  lc.lineWidth=3.5;lc.strokeStyle='#ff1f1f';lc.stroke();
 }
+const strokeSoon=()=>{if(!sraf)sraf=requestAnimationFrame(()=>{sraf=0;stroke()})};
 function end(){
   let p=pts;if(!p)return;
+  cancelAnimationFrame(sraf);sraf=0;
   let a=0;for(let i=0;i<p.length;i++){const q=p[(i+1)%p.length];a+=p[i][0]*q[1]-q[0]*p[i][1]}
   if(p.length<4||Math.abs(a/2)<200){pts=null;stroke();return} // too small: ignore
-  stroke(true);pts=null; // last point auto-joins the first
-  p=rdp(p,1.2);
+  p=chaikin(rdp(p,1),2); // lighter and smoother shape
+  pts=p;stroke(true);pts=null; // last point auto-joins the first
   const s=256*Math.pow(2,map.getZoom()),o=map.getPixelBounds().min,r=new Float64Array(p.length*2);
   p.forEach((q,i)=>{r[2*i]=(q[0]+o.x)/s;r[2*i+1]=(q[1]+o.y)/s});
-  user.push({c:side,rings:[bbox(r)]});redo=[];
-  changed();
-  fade=setTimeout(()=>lc.clearRect(0,0,W,H),380);
+  const op=mkop(side,r),dur=Math.round(650+650*Math.min(1,op.R*s/(.5*Math.max(W,H))));
+  op.d=dur;user.push(op);redo=[];launch(op,1,dur);
+  if(navigator.vibrate)navigator.vibrate(12);
+  changed(dur);
+  clearTimeout(fade);lcv.style.transition='none';lcv.style.opacity=1; // the outline stays while the area fills in, then fades
+  fade=setTimeout(()=>{lcv.style.transition='opacity .45s';lcv.style.opacity=0;fade=setTimeout(()=>{lc.clearRect(0,0,W,H);lcv.style.transition='none';lcv.style.opacity=1},480)},reduce?150:dur*.6);
 }
 lcv.addEventListener('pointerdown',e=>{
   if(e.pointerType==='mouse'&&e.button!==0)return;
   if(pts&&e.pointerId!==pid){pts=null;stroke();return} // second finger cancels the lasso
-  clearTimeout(fade);pid=e.pointerId;
+  clearTimeout(fade);lcv.style.transition='none';lcv.style.opacity=1;pid=e.pointerId;
   try{lcv.setPointerCapture(pid)}catch(_){}
   pts=[[e.clientX,e.clientY]];stroke();
 });
@@ -236,7 +296,7 @@ lcv.addEventListener('pointermove',e=>{
   if(!pts||e.pointerId!==pid)return;
   const ev=e.getCoalescedEvents&&e.getCoalescedEvents();
   for(const q of(ev&&ev.length?ev:[e])){const l=pts[pts.length-1];if(Math.hypot(q.clientX-l[0],q.clientY-l[1])>2)pts.push([q.clientX,q.clientY])}
-  stroke();
+  strokeSoon();
 });
 const up=e=>{if(e.pointerId===pid)end()};
 lcv.addEventListener('pointerup',up);
@@ -273,7 +333,7 @@ box.addEventListener('pointercancel',rpEnd);
 async function exportPng(){
   toast('Preparing image…');
   try{
-    draw();
+    finishAnims();draw();
     const k=Math.min(2,window.devicePixelRatio||1),cv=document.createElement('canvas');cv.width=Math.round(W*k);cv.height=Math.round(H*k);
     const g=cv.getContext('2d');g.fillStyle='#0b1118';g.fillRect(0,0,cv.width,cv.height);g.scale(k,k);
     let tiles=true;
@@ -285,7 +345,7 @@ async function exportPng(){
     g.globalAlpha=.5;g.drawImage(off,0,0,W,H);g.globalAlpha=1;
     g.fillStyle='rgba(14,20,28,.8)';g.fillRect(0,H-28,W,28);
     g.fillStyle='#fff';g.font='12px system-ui,sans-serif';g.textBaseline='middle';
-    g.textAlign='left';g.fillText('Territory Drawer · Україна '+$('#pu').textContent+' · Росія '+$('#pr').textContent,12,H-14);
+    g.textAlign='left';g.fillText('Territory Drawer · Україна '+fmt(pct.to[0])+' · Росія '+fmt(pct.to[1]),12,H-14);
     g.textAlign='right';g.fillText('Imagery © Esri, Maxar, Earthstar Geographics',W-12,H-14);
     cv.toBlob(b=>{
       if(!b){toast('Could not create the image');return}
@@ -305,7 +365,7 @@ const closeHelp=()=>{if(help.classList.contains('on')){help.classList.remove('on
 mvb.onclick=()=>mode(!document.body.classList.contains('move'));
 $('#un').onclick=undo;
 $('#re').onclick=redoOp;
-$('#rs').onclick=()=>{if(user.length)redo=user.slice().reverse();user=[];home();changed()}; // Reset can be undone with Redo
+$('#rs').onclick=()=>{if(user.length)redo=user.slice().reverse();for(const op of user){launch(op,0,600);dying.push(op)}user=[];ver++;home();changed(600)}; // Reset can be undone with Redo
 $('#sv').onclick=exportPng;
 $('#helpbtn').onclick=()=>{help.classList.add('on');$('#hx').focus()};
 $('#hx').onclick=closeHelp;
@@ -341,18 +401,21 @@ function ruRings(t){
   }
   return out;
 }
+// coarser copy of the outline for low zoom levels: far fewer points to draw while panning
+const lowRings=rs=>rs.map(r=>{const b=r.bb;if(b[2]-b[0]<6e-4&&b[3]-b[1]<6e-4)return null;const p=[];for(let i=0;i<r.length;i+=2)p.push([r[i],r[i+1]]);const q=rdp(p,1e-4),a=new Float64Array(q.length*2);q.forEach((v,i)=>{a[2*i]=v[0];a[2*i+1]=v[1]});return bbox(a)}).filter(Boolean);
 (async()=>{
   const U=['https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json','https://unpkg.com/world-atlas@2/countries-50m.json','https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'];
   toast('Loading borders…');
   for(const u of U){
     try{
       const r=await fetch(u);if(!r.ok)continue;
-      base=[{c:'r',b:1,rings:ruRings(await r.json())},{c:'r',b:1,rings:[proj(SEAM)]},UAop];
-      toast('');redraw();return;
+      const rr=ruRings(await r.json());
+      base=[{c:'r',b:1,rings:rr,low:lowRings(rr)},{c:'r',b:1,rings:[proj(SEAM)]},UAop];
+      ver++;showT();toast('');redraw();return;
     }catch(e){}
   }
   base=[{c:'r',b:1,rings:[proj(RU)]},UAop];
-  toast('Border data unavailable: simplified Russia outline');redraw();setTimeout(()=>toast(''),6000);
+  toast('Border data unavailable: simplified Russia outline');ver++;showT();redraw();setTimeout(()=>toast(''),6000);
 })();
 }
 </script>
